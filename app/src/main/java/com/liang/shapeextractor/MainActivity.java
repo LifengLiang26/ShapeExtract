@@ -22,7 +22,7 @@ public class MainActivity extends AppCompatActivity {
                 start.setEnabled(false);
                 File file = new File("/sdcard/GRD00000.bin");
                 try{
-                    ShapeExtractor extractor = new ShapeExtractor(file,122, 56);
+                    ShapeExtractor extractor = new ShapeExtractor(file,122, 56, 1);
 //                    util.printMatrix();
                     Log.d(TAG, "Done");
                 }catch (Exception e){
