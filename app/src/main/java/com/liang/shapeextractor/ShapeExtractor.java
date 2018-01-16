@@ -40,6 +40,7 @@ public class ShapeExtractor {
         islandKeys = new HashSet<>();
         loadRawData();
         buildIslands();
+        extractCoastLines();
     }
 
     private int byte4ToInt(byte[] bytes, int off) {
@@ -63,7 +64,7 @@ public class ShapeExtractor {
         int previous = -1;
         int below = -1;
         int cur = -1;
-        int roof = 1;
+        int roof = 4;
         for (int r = 0; r < row; r++) {
             previous = -1;
             for (int c = 0; c < col; c++) {
@@ -125,6 +126,7 @@ public class ShapeExtractor {
             }
 
         }
+        Log.d(TAG, "the island data");
         for (int i = 0; i < island.length; i++) {
             for (int j = 0; j < island[i].length; j++) {
                 if (!islandKeys.contains(island[i][j])) {
@@ -243,6 +245,8 @@ public class ShapeExtractor {
                         }
                     }
                 }
+                Log.d(TAG, "the island raw data with key :"+key);
+                printMatrix(data,row,col,true);
                 // find the coastline
                 // step 1: from up to down to find the edge
                 //
@@ -268,12 +272,15 @@ public class ShapeExtractor {
                 for (int i = 0; i < col; i++) {
                     current = 0;
                     for (int j = 0; j <= row; j++) {
-                        if (data[i][j] != current) { //inner edge, from 0 to island
-                            current = data[i][j];
-                            edges[i][j] |= int0x01;
+                        if (data[j][i] != current) { //inner edge, from 0 to island
+                            current = data[j][i];
+                            edges[j][i] |= int0x01;
                         }
                     }
                 }
+                Log.d(TAG,"island edge: ");
+                printMatrix(edges,row+1,col+1,true);
+
                 int start_r = -1; // start point
                 int start_c = -1;
                 for (int i = 0; i <= row; i++) {
@@ -304,40 +311,40 @@ public class ShapeExtractor {
 
                     while (true) {
                         //find the next point, checking if the current point is in a straight line, if not, add to path
-                        if(pre_r  == mid_r && current_r != mid_r) {// the last saved point and middle point is in horizontal
-                             // if the current point and mid point isn't in horizontal, need to save middle
-                                lpoints.add(new Lpoint(mid_r, mid_r));
-                                pre_r = mid_r;
-                                pre_c = mid_c;
-
-
-                        }
-                        else if(pre_c == mid_c && current_c != mid_c){// the last saved point and middle point is in vertical
-                            // if the current point and mid point isn't in vertical, need to save middle
-                            lpoints.add(new Lpoint(mid_r, mid_r));
-                                pre_r = mid_r;
-                                pre_c = mid_c;
-
-                        }
-                        mid_r = current_r;
-                        mid_c = current_c;
-
+//                        if(pre_r  == mid_r && current_r != mid_r) {// the last saved point and middle point is in horizontal
+//                            // if the current point and mid point isn't in horizontal, need to save middle
+//                            lpoints.add(new Lpoint(mid_r, mid_r));
+//                            pre_r = mid_r;
+//                            pre_c = mid_c;
+//
+//
+//                        }
+//                        else if(pre_c == mid_c && current_c != mid_c){// the last saved point and middle point is in vertical
+//                            // if the current point and mid point isn't in vertical, need to save middle
+//                            lpoints.add(new Lpoint(mid_r, mid_r));
+//                            pre_r = mid_r;
+//                            pre_c = mid_c;
+//
+//                        }
+//                        mid_r = current_r;
+//                        mid_c = current_c;
+                        lpoints.add(new Lpoint(current_r,current_c));
                         if ((edges[current_r][current_c] & int0x01) == int0x01) {//bottom (_) point, so next point will be right next
                             edges[current_r][current_c] ^= int0x01;
-                            current_r = current_r + 1;
+                            current_c = current_c + 1;
                         }
                         //this is the case that current point is |, so the next point will be above it.
                         else if ((edges[current_r][current_c] & int0x02) == int0x02) {
                             edges[current_r][current_c] ^= int0x02;
-                            current_c = current_c + 1;
+                            current_r = current_r + 1;
                         }
                         //this is the case that current point is right up corner or backward to this point, need to backward
                         else {
-                            if (current_r > 0 && (edges[current_r - 1][current_c] & int0x01) == int0x01) {
-                                current_r = current_r - 1;
-                                edges[current_r][current_c] ^= int0x01;
-                            } else if (col > 0 && (edges[current_r][current_c - 1] & int0x02) == int0x02) {
+                            if (current_c > 0 && (edges[current_r][current_c-1] & int0x01) == int0x01) {
                                 current_c = current_c - 1;
+                                edges[current_r][current_c] ^= int0x01;
+                            } else if (current_r > 0 && (edges[current_r-1][current_c] & int0x02) == int0x02) {
+                                current_r = current_r - 1;
                                 edges[current_r][current_c] ^= int0x02;
                             } else {
                                 Log.e(TAG, "Something is wrong, current_r = " + current_r + "; current_c = " + current_c + " cannot find the next point");
@@ -365,6 +372,8 @@ public class ShapeExtractor {
                         }
 
                     }
+                    start_r = -1;
+                    start_c = -1;
                     for (int i = 0; i <= row; i++) {
                         for (int j = 0; j <= col; j++) {
                             if (edges[i][j] != 0) {

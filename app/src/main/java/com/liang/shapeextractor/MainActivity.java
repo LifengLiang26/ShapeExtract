@@ -2,13 +2,14 @@ package com.liang.shapeextractor;
 
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
 import java.io.File;
 
 public class MainActivity extends AppCompatActivity {
-
+    private static String TAG = "ShapeExtractor";
     private Button start;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -18,16 +19,16 @@ public class MainActivity extends AppCompatActivity {
         start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                start.setEnabled(true);
+                start.setEnabled(false);
                 File file = new File("/sdcard/GRD00000.bin");
                 try{
-                    ShapeExtractor util = new ShapeExtractor(file,169, 86);
+                    ShapeExtractor extractor = new ShapeExtractor(file,122, 56);
 //                    util.printMatrix();
-                    util.trim();
+                    Log.d(TAG, "Done");
                 }catch (Exception e){
                     e.printStackTrace();
                 }
-                start.setEnabled(false);
+                start.setEnabled(true);
 
             }
         });
