@@ -13,7 +13,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Created by liang on 1/14/18.
@@ -21,13 +20,14 @@ import java.util.Set;
 
 public class ShapeExtractor {
     static private String TAG = ShapeExtractor.class.getSimpleName();
+    static private boolean Debug = true;
     private File file;
     private int row;
     private int col;
     private int recordN;
-    byte[][] data;
+    byte[][] rawData;
     int[][] island;
-    private Set<Integer> islandKeys;
+    private HashMap<Integer,byte[]> islandKeys;
     private static final int int0x01 = 0x01;
     private static final int int0x02 = 0x02;
     private List<CoastLine> islandPolygon;
@@ -37,14 +37,26 @@ public class ShapeExtractor {
         this.row = row;
         this.col = col;
         this.recordN = recordN;
-        data = new byte[row][col*recordN*4];
+        rawData = new byte[row][col*recordN*4];
         island = new int[row][col];
-        islandKeys = new HashSet<>();
+        islandKeys = new HashMap<>();
         loadRawData();
         buildIslands();
         extractCoastLines();
     }
 
+    private byte[] getBytesValue(int r, int c){
+        if(r < row && c < col) {
+            byte[] ret = new byte[recordN * 4];
+            for (int i = 0; i < recordN*4; i++) {
+                ret[i] = rawData[r][c * recordN * 4 + i];
+            }
+            return ret;
+        }
+        else{
+            return null;
+        }
+    }
     private int byte4ToInt(byte[] bytes, int off) {
         int b0 = bytes[off] & 0xFF;
         int b1 = bytes[off + 1] & 0xFF;
@@ -90,13 +102,6 @@ public class ShapeExtractor {
         return a==b;
     }
 
-    private int getValue(int r, int c) {
-        if (r < data.length && c < data[r].length) {
-            return data[r][c];
-        } else {
-            return -1;
-        }
-    }
 
     private void buildIslands() {
         int record_length = recordN*4;
@@ -107,25 +112,22 @@ public class ShapeExtractor {
                 //check with left cub
                 if (c == 0) {//if no left, will check below
                     if (r > 0) {//if it has below, will check with below
-                        if (isBytesEqual(data[r],c*record_length,data[r-1],c*record_length,record_length)) {//if equal to below, use same roof
+                        if (isBytesEqual(rawData[r],c*record_length, rawData[r-1],c*record_length,record_length)) {//if equal to below, use same roof
                             island[r][c] = island[r - 1][c];
                         } else {// if not equal, use a new roof
-//                            Log.d(TAG, "No left and below value is " + below + ";cur value is" + cur);
                             island[r][c] = roof++;
                         }
                     } else {//there is no below, use a new roof
-//                        Log.d(TAG, "No below, cur value is" + cur);
                         island[r][c] = roof++;
                     }
                 } else {//if there is a left
-                    if (isBytesEqual(data[r],(c-1)*record_length,data[r],c*record_length,record_length)) {
+                    if (isBytesEqual(rawData[r],(c-1)*record_length, rawData[r],c*record_length,record_length)) {
                         island[r][c] = island[r][c - 1];
 
                         if (r > 0) {//if have the below, check if color is same and its roof is different, need to change to same roof
                             int belowRoof = island[r - 1][c];
-                            // if data is equal but roof are different, change the roof same as above
-                            if (isBytesEqual(data[r-1], c*record_length, data[r], c*record_length, record_length) && belowRoof != island[r][c]) {
-//                                Log.d(TAG, "Merge :"+island[r-1][c]+" into "+island[r][c]);
+                            // if rawData is equal but roof are different, change the roof same as above
+                            if (isBytesEqual(rawData[r-1], c*record_length, rawData[r], c*record_length, record_length) && belowRoof != island[r][c]) {
                                 for (int i = 0; i < r; i++) {
                                     for (int j = 0; j < col; j++) {
                                         if (island[i][j] == belowRoof) {
@@ -141,16 +143,13 @@ public class ShapeExtractor {
                             }
                         }
                     } else {// if isn't equal to left, will check with below
-//                        Log.d(TAG, "row: "+r+", Col: "+"="+c);
                         if (r > 0) {// there is a below
-                            if (isBytesEqual(data[r],c*record_length,data[r-1],c*record_length,record_length)) {//if equal to below, set the roof as below
+                            if (isBytesEqual(rawData[r],c*record_length, rawData[r-1],c*record_length,record_length)) {//if equal to below, set the roof as below
                                 island[r][c] = island[r - 1][c];
                             } else { // if not equal to below, set a new roof
-//                                Log.d(TAG, "Adding new value: "+roof+1+", below value is "+ below+";cur value is"+cur);
                                 island[r][c] = roof++;
                             }
                         } else {// if there is no below, create a new roof
-//                            Log.d(TAG, "No below, Adding new value, cur value is"+cur);
                             island[r][c] = roof++;
                         }
                     }
@@ -158,21 +157,27 @@ public class ShapeExtractor {
             }
 
         }
-        Log.d(TAG, "the island data");
+        if(Debug){
+            Log.d(TAG, "the island rawData");
+        }
         for (int i = 0; i < island.length; i++) {
             for (int j = 0; j < island[i].length; j++) {
-                if (!islandKeys.contains(island[i][j])) {
-                    islandKeys.add(island[i][j]);
+                if (!islandKeys.containsKey(island[i][j])) {
+                    islandKeys.put(island[i][j],getBytesValue(i,j));
                 }
             }
         }
-        printMatrix(island, row, col, true);
-        Log.d(TAG, "");
+        if(Debug){
+            printMatrix(island, row, col, true);
+        }
+        if(Debug){
+            Log.d(TAG, "");
+        }
     }
 
     public List<Integer> getIslandKeys(){
         List<Integer> list = new ArrayList<Integer>(islandKeys.size());
-        list.addAll(islandKeys);
+        list.addAll(islandKeys.keySet());
         return list;
     }
 
@@ -231,6 +236,7 @@ public class ShapeExtractor {
     }
 
     static class CoastLine {
+        byte[] value;
         List<Lpoint> outerCoast;
         List<List<Lpoint>> innerCoast;
 
@@ -249,26 +255,34 @@ public class ShapeExtractor {
         public void setInnerCoast(List<List<Lpoint>> innerCoast) {
             this.innerCoast = innerCoast;
         }
+
+        public byte[] getValue() {
+            return value;
+        }
+
+        public void setValue(byte[] value) {
+            this.value = value;
+        }
     }
 
     private void extractCoastLines(){
         if(islandKeys.size() > 0) {
             islandPolygon = new LinkedList<>();
-            Iterator<Integer> iterator = islandKeys.iterator();
+            Iterator<Integer> iterator = islandKeys.keySet().iterator();
             int key = -1;
             int current = 0;
             int[][] data1 = new int[row+1][col+1];
             int[][] edges = new int[row + 1][col + 1];
             while (iterator.hasNext()) {
                 key = iterator.next();
-                //step 0: reset data[][]
+                //step 0: reset rawData[][]
                 for (int i = 0; i <= row; i++) {
                     for (int j = 0; j <= col; j++) {
                         data1[i][j] = 0;
                     }
                 }
 
-                //step 1: load the island raw data to data
+                //step 1: load the island raw rawData to rawData
                 for (int i = 0; i < row; i++) {
                     for (int j = 0; j < col; j++) {
                         if (island[i][j] == key) {
@@ -278,8 +292,10 @@ public class ShapeExtractor {
                         }
                     }
                 }
-                Log.d(TAG, "the island raw data with key :"+key);
-                printMatrix(data1,row,col,true);
+                if(Debug) {
+                    Log.d(TAG, "the island raw rawData with key :" + key);
+                    printMatrix(data1, row, col, true);
+                }
                 // find the coastline
                 // step 1: from up to down to find the edge
                 //
@@ -311,8 +327,10 @@ public class ShapeExtractor {
                         }
                     }
                 }
-                Log.d(TAG,"island edge: ");
-                printMatrix(edges,row+1,col+1,true);
+                if(Debug){
+                    Log.d(TAG,"island edge: ");
+                    printMatrix(edges,row+1,col+1,true);
+                }
 
                 int start_r = -1; // start point
                 int start_c = -1;
@@ -335,6 +353,7 @@ public class ShapeExtractor {
                 int mid_r; // the middle point
                 int mid_c;
                 CoastLine coastLine = new CoastLine();
+                coastLine.setValue(islandKeys.get(key));
                 //found a loop
                 while (start_c != -1 && start_r != -1) {
                     List<Lpoint> lpoints = new LinkedList<>();
@@ -443,7 +462,7 @@ public class ShapeExtractor {
         }
         try {
             for (int i = 0; i < row; i++) {
-                int length = in.read(data[i]);
+                int length = in.read(rawData[i]);
                 if (length != col * recordN * 4) {
                     Log.e(TAG, "Data read back size is wrong, expected: "+col*recordN*4+"actual :"+length);
                 }
@@ -482,7 +501,7 @@ public class ShapeExtractor {
     }
 
     public void printMatrix() {
-        printMatrix(data, row, col, recordN);
+        printMatrix(rawData, row, col, recordN);
         Log.d(TAG, "island area");
         printMatrix(island, row, col, true);
     }
